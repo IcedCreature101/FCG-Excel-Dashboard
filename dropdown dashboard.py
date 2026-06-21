@@ -64,8 +64,9 @@ if desc_column in df.columns and type_column in df.columns:
     # --- 7. THE DUAL DROPDOWNS ---
     st.write("### 🎯 Refine Your Search")
     
-    desc_options = ["-- Any Description --"] + sorted(filtered_df[desc_column].unique())
-    type_options = ["-- Any Type No --"] + sorted(filtered_df[type_column].unique())
+   # The [str(x) for x in ...] forces every item to be text before sorting, preventing TypeErrors
+    desc_options = ["-- Any Description --"] + sorted([str(x) for x in filtered_df[desc_column].unique()])
+    type_options = ["-- Any Type No --"] + sorted([str(x) for x in filtered_df[type_column].unique()])
     
     col1, col2 = st.columns(2)
     with col1:
