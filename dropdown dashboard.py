@@ -1,42 +1,62 @@
 import streamlit as st
 import pandas as pd
 import re
+import os # We need this new module to check the server's hard drive
 
 # 1. FORCE FULL SCREEN WIDE LAYOUT (Must be first!)
 st.set_page_config(layout="wide", page_title="Master Sheet Explorer")
 
-st.title("Master Sheet Explorer")
+st.title("Master Sheet Explorer (Persistent Web Edition)")
 
-# --- 2. FILE UPLOADER (SIDEBAR) ---
+# The name of the file as it will be saved on the cloud server
+SERVER_FILE_PATH = "temp_master_sheet.xlsx"
+
+# --- 2. THE PERSISTENT UPLOADER (SIDEBAR) ---
 with st.sidebar:
     st.write("### 📁 Data Setup")
-    # This creates the drag-and-drop box
-    uploaded_file = st.file_uploader("Upload your Master Sheet (.xlsx)", type=["xlsx"])
     
-    st.write("---")
-    
+    # Check if the file is ALREADY on the server
+    if os.path.exists(SERVER_FILE_PATH):
+        st.success("✅ File is currently loaded in server memory.")
+        st.info("You can safely close this tab and come back later. The data will remain.")
+        
+        # Give you a way to delete it if you want to upload a newer version
+        if st.button("🗑️ Delete Saved File & Upload New"):
+            os.remove(SERVER_FILE_PATH)
+            st.cache_data.clear() # Clear the old data from memory
+            st.rerun() # Refresh the page
+            
+    else:
+        # If the file is NOT on the server, show the uploader
+        uploaded_file = st.file_uploader("Upload your Master Sheet (.xlsx)", type=["xlsx"])
+        
+        if uploaded_file is not None:
+            # Save the uploaded file directly to the server's local storage
+            with open(SERVER_FILE_PATH, "wb") as f:
+                f.write(uploaded_file.getbuffer())
+            
+            st.success("File saved securely to server! Reloading...")
+            st.rerun() # Refresh the page to hide the uploader and show the dashboard
 
-# --- 3. STOP APP IF NO FILE UPLOADED ---
-if uploaded_file is None:
-    st.warning("👈 Please upload your Excel file in the sidebar to load the dashboard.")
-    st.stop() # This halts the code right here until a file is dropped in.
+# --- 3. STOP APP IF NO FILE EXISTS ---
+if not os.path.exists(SERVER_FILE_PATH):
+    st.warning("👈 Please upload your Excel file in the sidebar to begin.")
+    st.stop()
 
-# --- 4. READ THE UPLOADED FILE ---
-# We read the file directly from memory, no C:\ drive paths needed!
+# --- 4. READ THE SAVED FILE ---
 @st.cache_data
-def load_uploaded_data(file):
-    df = pd.read_excel(file)
+def load_data(filepath):
+    df = pd.read_excel(filepath)
     df.columns = df.columns.str.strip()
     return df
 
-df = load_uploaded_data(uploaded_file)
+df = load_data(SERVER_FILE_PATH)
 
 # --- 5. TARGET COLUMNS ---
 desc_column = "ITEM DESCRIPTION"
-type_column = "TYPE NO."
+type_column = "TYPE NO"
 
 if desc_column in df.columns and type_column in df.columns:
-    # Clean up column data strings
     df[desc_column] = df[desc_column].astype(str).str.strip()
     df[type_column] = df[type_column].astype(str).str.strip()
     
@@ -64,7 +84,6 @@ if desc_column in df.columns and type_column in df.columns:
     # --- 7. THE DUAL DROPDOWNS ---
     st.write("### 🎯 Refine Your Search")
     
-   # The [str(x) for x in ...] forces every item to be text before sorting, preventing TypeErrors
     desc_options = ["-- Any Description --"] + sorted([str(x) for x in filtered_df[desc_column].unique()])
     type_options = ["-- Any Type No --"] + sorted([str(x) for x in filtered_df[type_column].unique()])
     
@@ -94,7 +113,7 @@ if desc_column in df.columns and type_column in df.columns:
         with m_col2:
             st.metric(label="Total Sheet Columns", value=len(filtered_df.columns))
         with m_col3:
-            st.success("Ready for Cloud Deployment ☁️")
+            st.success("Persistent Server Storage Active 💾")
             
     else:
         st.warning("No records match this combination. Try resetting one to '-- Any --'.")
