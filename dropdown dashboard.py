@@ -54,7 +54,7 @@ df = load_data(SERVER_FILE_PATH)
 
 # --- 5. TARGET COLUMNS ---
 desc_column = "ITEM DESCRIPTION"
-type_column = "TYPE NO"
+type_column = "TYPE NO."
 
 if desc_column in df.columns and type_column in df.columns:
     df[desc_column] = df[desc_column].astype(str).str.strip()
