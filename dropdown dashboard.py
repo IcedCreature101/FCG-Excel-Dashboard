@@ -1,23 +1,48 @@
 import streamlit as st
 import pandas as pd
 import re
+import os
 
-# 1. FORCE FULL SCREEN WIDE LAYOUT
-st.set_page_config(layout="wide")
+st.set_page_config(layout="wide", page_title="Master Sheet Explorer & Analytics")
 
-st.title("Master Sheet Explorer (Multi-Filter Search)")
+st.title("Master Sheet Explorer + Price Analytics 📊")
 
-# --- 2. DATA LOADING & CACHING ---
+SERVER_FILE_PATH = "temp_master_sheet.xlsx"
+
+# --- 1. PERSISTENT UPLOADER (SIDEBAR) ---
+with st.sidebar:
+    st.write("### 📁 Data Setup")
+    
+    if os.path.exists(SERVER_FILE_PATH):
+        st.success("✅ File is currently loaded in server memory.")
+        if st.button("🗑️ Delete Saved File & Upload New"):
+            os.remove(SERVER_FILE_PATH)
+            st.cache_data.clear()
+            st.rerun()
+            
+    else:
+        uploaded_file = st.file_uploader("Upload your Master Sheet (.xlsx)", type=["xlsx"])
+        if uploaded_file is not None:
+            with open(SERVER_FILE_PATH, "wb") as f:
+                f.write(uploaded_file.getbuffer())
+            st.success("File saved securely to server! Reloading...")
+            st.rerun()
+
+# --- 2. THE SAFETY STOP (Crucial for preventing the crash!) ---
+if not os.path.exists(SERVER_FILE_PATH):
+    st.warning("👈 Please upload your Excel file in the sidebar to begin.")
+    st.stop() # This forces Python to stop reading the rest of the file until an upload happens
+
+# --- 3. READ & CLEAN DATA (Will only run if the file exists) ---
 @st.cache_data
-def load_data():
-    file_path = r"C:\Users\kauzp\OneDrive\Documents\Master sheet.xlsx"
-    # Using 'rb' mode to bypass the Windows Excel lock
-    with open(file_path, 'rb') as f:
-        df = pd.read_excel(f)
+def load_and_clean_data(filepath):
+    df = pd.read_excel(filepath)
     df.columns = df.columns.str.strip()
     return df
 
-df = load_data()
+df = load_and_clean_data(SERVER_FILE_PATH)
+
+# ... (The rest of your target columns and dropdown logic goes here) ...
 
 # --- 3. REFRESH BUTTON (SIDEBAR) ---
 with st.sidebar:
