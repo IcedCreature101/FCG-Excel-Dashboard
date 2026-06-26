@@ -1,111 +1,104 @@
 import streamlit as st
 import pandas as pd
 import re
-import os # We need this new module to check the server's hard drive
 
-# 1. FORCE FULL SCREEN WIDE LAYOUT (Must be first!)
-st.set_page_config(layout="wide", page_title="Master Sheet Explorer")
+# 1. FORCE FULL SCREEN WIDE LAYOUT
+st.set_page_config(layout="wide")
 
-st.title("Master Sheet Explorer (Persistent Web Edition)")
+st.title("Master Sheet Explorer (Multi-Filter Search)")
 
-# The name of the file as it will be saved on the cloud server
-SERVER_FILE_PATH = "temp_master_sheet.xlsx"
-
-# --- 2. THE PERSISTENT UPLOADER (SIDEBAR) ---
-with st.sidebar:
-    st.write("### 📁 Data Setup")
-    
-    # Check if the file is ALREADY on the server
-    if os.path.exists(SERVER_FILE_PATH):
-        st.success("✅ File is currently loaded in server memory.")
-        st.info("You can safely close this tab and come back later. The data will remain.")
-        
-        # Give you a way to delete it if you want to upload a newer version
-        if st.button("🗑️ Delete Saved File & Upload New"):
-            os.remove(SERVER_FILE_PATH)
-            st.cache_data.clear() # Clear the old data from memory
-            st.rerun() # Refresh the page
-            
-    else:
-        # If the file is NOT on the server, show the uploader
-        uploaded_file = st.file_uploader("Upload your Master Sheet (.xlsx)", type=["xlsx"])
-        
-        if uploaded_file is not None:
-            # Save the uploaded file directly to the server's local storage
-            with open(SERVER_FILE_PATH, "wb") as f:
-                f.write(uploaded_file.getbuffer())
-            
-            st.success("File saved securely to server! Reloading...")
-            st.rerun() # Refresh the page to hide the uploader and show the dashboard
-
-# --- 3. STOP APP IF NO FILE EXISTS ---
-if not os.path.exists(SERVER_FILE_PATH):
-    st.warning("👈 Please upload your Excel file in the sidebar to begin.")
-    st.stop()
-
-# --- 4. READ THE SAVED FILE ---
+# --- 2. DATA LOADING & CACHING ---
 @st.cache_data
-def load_data(filepath):
-    df = pd.read_excel(filepath)
+def load_data():
+    file_path = r"C:\Users\kauzp\OneDrive\Documents\Master sheet.xlsx"
+    # Using 'rb' mode to bypass the Windows Excel lock
+    with open(file_path, 'rb') as f:
+        df = pd.read_excel(f)
     df.columns = df.columns.str.strip()
     return df
 
-df = load_data(SERVER_FILE_PATH)
+df = load_data()
 
-# --- 5. TARGET COLUMNS ---
+# --- 3. REFRESH BUTTON (SIDEBAR) ---
+with st.sidebar:
+    st.write("### Controls")
+    if st.button("🔄 Refresh Data"):
+        load_data.clear()
+        st.rerun()
+
+# --- 4. TARGET COLUMNS ---
+# IMPORTANT: Ensure these match your Excel headers exactly!
 desc_column = "ITEM DESCRIPTION"
-type_column = "TYPE NO."
+type_column = "TYPE NO." 
 
 if desc_column in df.columns and type_column in df.columns:
+    # Clean up column data strings (removes hidden spaces and handles blank cells safely)
     df[desc_column] = df[desc_column].astype(str).str.strip()
     df[type_column] = df[type_column].astype(str).str.strip()
     
     st.write("---")
     
-    # --- 6. UNIFIED MULTI-KEYWORD SEARCH BAR ---
+    # --- 5. UNIFIED MULTI-KEYWORD SEARCH BAR ---
     search_input = st.text_input(
         "🔍 Type keywords to filter the options below (Scans both Description & Type No):", 
         value=""
     ).strip()
     
+    # Start with the full list
     filtered_df = df.copy()
     
+    # Smart Text Filter
     if search_input:
         keywords = search_input.split()
         for word in keywords:
             escaped_word = re.escape(word)
             pattern = rf"\b{escaped_word}\b"
             
+            # Search both columns. The '|' means OR (match in Description OR Type No)
             mask_desc = filtered_df[desc_column].str.contains(pattern, regex=True, case=False, na=False)
             mask_type = filtered_df[type_column].str.contains(pattern, regex=True, case=False, na=False)
             
             filtered_df = filtered_df[mask_desc | mask_type]
 
-    # --- 7. THE DUAL DROPDOWNS ---
+    # --- 6. THE DUAL DROPDOWNS ---
     st.write("### 🎯 Refine Your Search")
     
-    desc_options = ["-- Any Description --"] + sorted([str(x) for x in filtered_df[desc_column].unique()])
-    type_options = ["-- Any Type No --"] + sorted([str(x) for x in filtered_df[type_column].unique()])
+    # Get sorted unique options based on the text filter above, adding an "Any" option
+    desc_options = ["-- Any Description --"] + sorted(filtered_df[desc_column].unique())
+    type_options = ["-- Any Type No --"] + sorted(filtered_df[type_column].unique())
     
+    # Place dropdowns side-by-side
     col1, col2 = st.columns(2)
     with col1:
         selected_desc = st.selectbox("1. Filter by Description:", desc_options)
     with col2:
         selected_type = st.selectbox("2. Filter by Type No:", type_options)
         
+    # Apply the Dropdown Filters to the Dataframe
     if selected_desc != "-- Any Description --":
         filtered_df = filtered_df[filtered_df[desc_column] == selected_desc]
         
     if selected_type != "-- Any Type No --":
         filtered_df = filtered_df[filtered_df[type_column] == selected_type]
 
-    # --- 8. FULL SCREEN RESULTS DISPLAY ---
+    # --- 7. FULL SCREEN RESULTS DISPLAY ---
     st.write("---")
     
     if not filtered_df.empty:
         st.write("### Complete Details:")
-        st.dataframe(filtered_df, use_container_width=True)
+        st.dataframe(
+    filtered_df, 
+    use_container_width=True,
+    row_height=100, # Increases cell height so text can wrap to multiple lines
+    column_config={
+        desc_column: st.column_config.TextColumn(
+            "ITEM DESCRIPTION", 
+            width="large" # Forces this specific column to stretch out
+        )
+    }
+)
         
+        # Quick Stats Layout
         st.write("---")
         m_col1, m_col2, m_col3 = st.columns(3)
         with m_col1:
@@ -113,12 +106,13 @@ if desc_column in df.columns and type_column in df.columns:
         with m_col2:
             st.metric(label="Total Sheet Columns", value=len(filtered_df.columns))
         with m_col3:
-            st.success("Persistent Server Storage Active 💾")
+            st.success("Dual Filter & Smart Search: Active")
             
     else:
-        st.warning("No records match this combination. Try resetting one to '-- Any --'.")
+        st.warning("No records match this combination of Description and Type No. Try resetting one to '-- Any --'.")
 
 else:
-    st.error(f"Could not find the columns '{desc_column}' and/or '{type_column}'.")
-    st.write("### Actual column names found in your uploaded file:")
+    st.error(f"Could not find the columns '{desc_column}' and/or '{type_column}' in your Excel file.")
+    st.write("### Actual column names found in your file:")
     st.write(list(df.columns))
+    st.info("Check Lines 31 & 32 in your code and update the names to match the list above exactly.")
