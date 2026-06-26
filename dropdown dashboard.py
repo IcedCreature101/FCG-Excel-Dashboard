@@ -86,17 +86,7 @@ if desc_column in df.columns and type_column in df.columns:
     
     if not filtered_df.empty:
         st.write("### Complete Details:")
-        st.dataframe(
-    filtered_df, 
-    use_container_width=True,
-    row_height=100, # Increases cell height so text can wrap to multiple lines
-    column_config={
-        desc_column: st.column_config.TextColumn(
-            "ITEM DESCRIPTION", 
-            width="large" # Forces this specific column to stretch out
-        )
-    }
-)
+        st.dataframe(filtered_df, use_container_width=True)
         
         # Quick Stats Layout
         st.write("---")
