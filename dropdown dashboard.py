@@ -89,8 +89,8 @@ if desc_column in df.columns and type_column in df.columns:
     st.write("### 🎯 Refine Your Search")
     
     # Get sorted unique options based on the text filter above, adding an "Any" option
-    desc_options = ["-- Any Description --"] + sorted(filtered_df[desc_column].unique())
-    type_options = ["-- Any Type No --"] + sorted(filtered_df[type_column].unique())
+    desc_options = ["-- Any Description --"] + sorted([str(x) for x in filtered_df[desc_column].unique()])
+    type_options = ["-- Any Type No --"] + sorted([str(x) for x in filtered_df[type_column].unique()])
     
     # Place dropdowns side-by-side
     col1, col2 = st.columns(2)
